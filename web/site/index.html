@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>同步辐射光纤束路重接 · 辫群等价复核</title>
+<style>
+:root{
+  --bg:#0f1720; --panel:#18222e; --line:#2a3a4d; --text:#e8eef5;
+  --muted:#8fa3b8; --accent:#4cc2ff; --ok:#2fbf71; --bad:#ff5d5d; --warn:#ffb020;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);line-height:1.6;
+  font-family:"PingFang SC","Microsoft YaHei",system-ui,-apple-system,"Segoe UI",sans-serif}
+header{padding:28px 20px 6px;max-width:980px;margin:0 auto}
+h1{font-size:22px;margin:0 0 6px}
+header p{margin:0;color:var(--muted);font-size:14px}
+main{max-width:980px;margin:0 auto;padding:14px 20px 48px;display:grid;gap:16px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 20px}
+.field{margin-bottom:12px}
+label{display:block;font-size:14px;margin-bottom:6px;color:var(--muted)}
+input[type=text],textarea{width:100%;background:#0d151f;border:1px solid var(--line);border-radius:8px;
+  color:var(--text);padding:9px 12px;font-size:15px;font-family:inherit}
+textarea{resize:vertical;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+input:focus,textarea:focus{outline:none;border-color:var(--accent)}
+.invalid{border-color:var(--bad)!important}
+.error{color:var(--bad);font-size:13px;min-height:18px;margin-top:4px}
+.hint{font-size:13px;color:var(--muted);margin:2px 0 12px}
+.actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+button{background:var(--accent);border:none;color:#04263a;font-weight:600;padding:9px 18px;
+  border-radius:8px;font-size:14px;cursor:pointer}
+button:disabled{opacity:.45;cursor:not-allowed}
+#cancelBtn{background:#2a3a4d;color:var(--text)}
+.samples{color:var(--muted);font-size:13px;display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap}
+.samples button{background:#22303f;color:var(--accent);font-weight:400;padding:5px 10px;font-size:13px}
+.status{font-size:13px;color:var(--warn);min-height:20px;margin-top:10px}
+.verdict{font-size:20px;font-weight:700;padding:10px 16px;border-radius:8px;text-align:center;margin-bottom:14px}
+.verdict.eq{background:rgba(47,191,113,.14);color:var(--ok);border:1px solid var(--ok)}
+.verdict.ne{background:rgba(255,93,93,.12);color:var(--bad);border:1px solid var(--bad)}
+.chains{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:720px){.chains{grid-template-columns:1fr}}
+.chain h3{margin:0 0 8px;font-size:14px;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{background:#0d151f;border:1px solid var(--line);border-radius:6px;padding:5px 10px;
+  font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px}
+.chip.delta{border-color:var(--accent);color:var(--accent)}
+.chip.identity{color:var(--muted)}
+.dot{color:var(--muted)}
+.meta{margin-top:8px;font-size:12px;color:var(--muted)}
+.perms{margin-top:14px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px}
+.warn{margin-top:10px;background:rgba(255,176,32,.1);border:1px solid var(--warn);color:var(--warn);
+  border-radius:8px;padding:10px 12px;font-size:13px}
+.divergence{margin-top:10px;background:rgba(255,93,93,.08);border:1px solid var(--bad);
+  border-radius:8px;padding:10px 12px;font-size:14px}
+.ok-note{margin-top:10px;color:var(--ok);font-size:13px}
+.stale{opacity:.4;filter:grayscale(.6)}
+.placeholder{color:var(--muted);font-size:14px;margin:0}
+.note h2{font-size:15px;margin:0 0 8px}
+.note p{font-size:13px;color:var(--muted);margin:6px 0}
+code{background:#0d151f;padding:1px 6px;border-radius:4px;
+  font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <h1>同步辐射光纤束路重接 · 辫群等价复核</h1>
+  <p>以辫群 B<sub>n</sub> 的 Garside 左贪婪规范形精确判定两条重接记录是否等价；计算在浏览器 Worker 中执行。</p>
+</header>
+<main>
+  <section class="panel">
+    <div class="field">
+      <label for="strands">光纤根数 n（2–6，按固定顺序编号 1…n）</label>
+      <input id="strands" type="text" inputmode="numeric" value="4" autocomplete="off">
+      <div class="error" id="errStrands"></div>
+    </div>
+    <div class="field">
+      <label for="recordA">记录 A（重接前）</label>
+      <textarea id="recordA" rows="2" placeholder="例如：σ1 σ3  或  s1 s2^-1 σ3'">σ1 σ3</textarea>
+      <div class="error" id="errA"></div>
+    </div>
+    <div class="field">
+      <label for="recordB">记录 B（重接后）</label>
+      <textarea id="recordB" rows="2" placeholder="空记录表示单位元（未做任何交叉）">σ3 σ1</textarea>
+      <div class="error" id="errB"></div>
+    </div>
+    <p class="hint">
+      语法：发生器 <code>σ1…σ(n-1)</code>（亦接受 <code>s1</code> 或裸数字）；逆元写作
+      <code>σ1^-1</code>、<code>σ1^{-1}</code>、<code>σ1'</code> 或 <code>σ1⁻¹</code>；
+      符号以空白分隔；空记录 = 单位元；每条记录 ≤ 80 个符号。
+    </p>
+    <div class="actions">
+      <button id="computeBtn" type="button">计算等价性</button>
+      <button id="cancelBtn" type="button" disabled>取消</button>
+      <span class="samples">业务样例：
+        <button type="button" data-sample="1">远交换 σ1σ3 ↔ σ3σ1（n=4）</button>
+        <button type="button" data-sample="2">编织 σ1σ2σ1 ↔ σ2σ1σ2（n=3）</button>
+        <button type="button" data-sample="3">同置换异辫 σ1σ1 ↔ ε（n=2）</button>
+      </span>
+    </div>
+    <div id="status" class="status" role="status"></div>
+  </section>
+
+  <section id="result" class="panel" aria-live="polite"></section>
+
+  <section class="panel note">
+    <h2>方法说明</h2>
+    <p>每条记录被归约为唯一的 Garside 左贪婪规范形 <code>Δ^k · A₁ A₂ … A_m</code>（Aᵢ 为真简单元，相邻对左权重）。
+      两条记录等价，当且仅当两侧规范因子链逐项相同；不等价时给出首个分歧因子。</p>
+    <p>逆元按 <code>σᵢ⁻¹ = ∂σᵢ·Δ⁻¹ = Δ⁻¹·τ(∂σᵢ)</code> 精确改写（Δ 移动时对途经因子施加翻转自同构 τ），
+      远交换（|i−j|≥2）与三项编织关系（σᵢσᵢ₊₁σᵢ = σᵢ₊₁σᵢσᵢ₊₁）均由规范形的唯一性覆盖。
+      判定不依赖有限次试变换、随机改写，也不仅凭诱导置换：即使两侧诱导置换同为恒等，只要规范链不同即判不等价。</p>
+  </section>
+</main>
+<script src="braid.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

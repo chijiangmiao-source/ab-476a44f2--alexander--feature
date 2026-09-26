@@ -1,0 +1,24 @@
+services:
+  # 静态页面服务：可配置端口（APP_PORT，默认 8080），健康路径 /healthz
+  web:
+    build: ./web
+    ports:
+      - "${APP_PORT:-8080}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+      start_period: 3s
+    restart: unless-stopped
+
+  # 验证服务：代码测试 → 构建产物检查 → 健康路径冒烟，完成后以退出码报告结果
+  verify:
+    build:
+      context: .
+      dockerfile: verify/Dockerfile
+    environment:
+      WEB_URL: http://web
+    depends_on:
+      web:
+        condition: service_healthy
