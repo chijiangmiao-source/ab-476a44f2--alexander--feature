@@ -55,6 +55,22 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .ok-note{margin-top:10px;color:var(--ok);font-size:13px}
 .stale{opacity:.4;filter:grayscale(.6)}
 .placeholder{color:var(--muted);font-size:14px;margin:0}
+.audit-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.audit-head h2{font-size:16px;margin:0;flex:1 1 auto}
+#auditBtn{background:#1d4f66;color:var(--accent);border:1px solid var(--accent)}
+.audit-sides{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px}
+@media(max-width:720px){.audit-sides{grid-template-columns:1fr}}
+.side{background:#0d151f;border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.side h3{margin:0 0 6px;font-size:13px;color:var(--muted);font-weight:400}
+.side h3.fp-title{margin-top:10px}
+.side .kv{font-size:14px;margin-bottom:4px}
+.side.diff{border-color:var(--bad);background:rgba(255,93,93,.06)}
+.side.diff .kv b{color:var(--bad)}
+.chips.diffchain{padding:4px 6px;margin:2px -6px;border:1px dashed var(--bad);border-radius:6px}
+.coeff-meta{font-size:12px;color:var(--muted);margin-top:6px}
+.verdict.fp-same{background:rgba(76,194,255,.10);color:var(--accent);border:1px solid var(--accent)}
+.fp-note{margin-top:10px;font-size:13px;color:var(--muted)}
+.fp-note strong{color:var(--warn);font-weight:600}
 .note h2{font-size:15px;margin:0 0 8px}
 .note p{font-size:13px;color:var(--muted);margin:6px 0}
 code{background:#0d151f;padding:1px 6px;border-radius:4px;
@@ -102,6 +118,20 @@ code{background:#0d151f;padding:1px 6px;border-radius:4px;
 
   <section id="result" class="panel" aria-live="polite"></section>
 
+  <section class="panel" id="auditPanel">
+    <div class="audit-head">
+      <h2>闭合编织审计（约化 Burau · Alexander 闭包指纹）</h2>
+      <button id="auditBtn" type="button">发起闭合审计</button>
+    </div>
+    <p class="hint" style="margin:0 0 4px">
+      把两侧记录精确映射为可逆的约化 Burau 矩阵，闭包后计算
+      <strong>闭合分量数</strong>与<strong>规范化 Alexander 多项式</strong>。
+      审计依据闭包不变量，<strong>不以诱导置换或发生器计数为依据</strong>。
+    </p>
+    <div id="auditStatus" class="status" role="status"></div>
+    <div id="auditResult"></div>
+  </section>
+
   <section class="panel note">
     <h2>方法说明</h2>
     <p>每条记录被归约为唯一的 Garside 左贪婪规范形 <code>Δ^k · A₁ A₂ … A_m</code>（Aᵢ 为真简单元，相邻对左权重）。
@@ -109,9 +139,15 @@ code{background:#0d151f;padding:1px 6px;border-radius:4px;
     <p>逆元按 <code>σᵢ⁻¹ = ∂σᵢ·Δ⁻¹ = Δ⁻¹·τ(∂σᵢ)</code> 精确改写（Δ 移动时对途经因子施加翻转自同构 τ），
       远交换（|i−j|≥2）与三项编织关系（σᵢσᵢ₊₁σᵢ = σᵢ₊₁σᵢσᵢ₊₁）均由规范形的唯一性覆盖。
       判定不依赖有限次试变换、随机改写，也不仅凭诱导置换：即使两侧诱导置换同为恒等，只要规范链不同即判不等价。</p>
+    <p><strong>闭合编织审计</strong>是另一种证据：经约化 Burau 表示 <code>ρ(β) ∈ GL<sub>n−1</sub>(Z[t,t⁻¹])</code>（系数 BigInt 精确，
+      正负发生器严格互逆），由 <code>det(I−ρ(β)) = (1+t+…+tⁿ⁻¹)·Δ<sub>闭包</sub>(t)</code> 提取规范化 Alexander 多项式，
+      并以诱导置换的轮换数给出闭合分量数。指纹不同即可确认闭包确有差异并标出差异侧的系数链；
+      指纹相同只说明该不变量未发现差异，<strong>不能据此宣称两条辫必然等价</strong>。
+      空记录形成 n 分量闭包，稳定给出零多项式与分量数 n。</p>
   </section>
 </main>
 <script src="braid.js"></script>
+<script src="burau.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -24,10 +24,11 @@ function expectAsset(path, substrings) {
 }
 
 Promise.resolve()
-  .then(function () { return expectAsset('/', ['braid.js', 'app.js', '光纤根数']); })
+  .then(function () { return expectAsset('/', ['braid.js', 'burau.js', 'app.js', '光纤根数', '闭合编织审计']); })
   .then(function () { return expectAsset('/braid.js', ['normalForm', 'normalizePair']); })
-  .then(function () { return expectAsset('/worker.js', ['importScripts', 'onmessage']); })
-  .then(function () { return expectAsset('/app.js', ['new Worker', 'generation']); })
+  .then(function () { return expectAsset('/burau.js', ['reducedBurau', 'compareClosures', 'Alexander']); })
+  .then(function () { return expectAsset('/worker.js', ['importScripts', 'onmessage', 'closure']); })
+  .then(function () { return expectAsset('/app.js', ['new Worker', 'generation', 'runAudit']); })
   .then(function () {
     if (failed) {
       console.error('页面构建产物检查失败（' + failed + ' 项）');
