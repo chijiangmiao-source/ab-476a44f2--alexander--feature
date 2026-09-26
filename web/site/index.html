@@ -55,6 +55,21 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .ok-note{margin-top:10px;color:var(--ok);font-size:13px}
 .stale{opacity:.4;filter:grayscale(.6)}
 .placeholder{color:var(--muted);font-size:14px;margin:0}
+.audit-side{background:#0d151f;border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.audit-side.diff{border-color:var(--bad)}
+.audit-side.diff .chip.coef .cv{color:var(--bad)}
+.audit-side.diff .alex-expr{color:var(--bad)}
+.audit-side h3{margin:0 0 8px;font-size:14px;color:var(--muted);display:flex;gap:8px;align-items:center}
+.diff-badge{background:rgba(255,93,93,.18);color:var(--bad);border:1px solid var(--bad);
+  border-radius:5px;padding:1px 7px;font-size:12px;font-weight:600}
+.coeff-chain{margin-bottom:6px}
+.chip.coef{display:inline-flex;flex-direction:column;align-items:center;padding:4px 9px;min-width:38px}
+.chip.coef .pw{font-size:11px;color:var(--muted)}
+.chip.coef .cv{font-size:14px;color:var(--accent)}
+.chip.zero-poly{color:var(--muted)}
+.alex-expr{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--text)}
+.comp-badge{color:var(--bad);font-size:12px}
+#auditBtn{background:#7c5cff;border-color:#7c5cff;color:#fff}
 .note h2{font-size:15px;margin:0 0 8px}
 .note p{font-size:13px;color:var(--muted);margin:6px 0}
 code{background:#0d151f;padding:1px 6px;border-radius:4px;
@@ -90,6 +105,7 @@ code{background:#0d151f;padding:1px 6px;border-radius:4px;
     </p>
     <div class="actions">
       <button id="computeBtn" type="button">计算等价性</button>
+      <button id="auditBtn" type="button">发起闭合编织审计</button>
       <button id="cancelBtn" type="button" disabled>取消</button>
       <span class="samples">业务样例：
         <button type="button" data-sample="1">远交换 σ1σ3 ↔ σ3σ1（n=4）</button>
@@ -102,6 +118,8 @@ code{background:#0d151f;padding:1px 6px;border-radius:4px;
 
   <section id="result" class="panel" aria-live="polite"></section>
 
+  <section id="audit" class="panel" aria-live="polite"></section>
+
   <section class="panel note">
     <h2>方法说明</h2>
     <p>每条记录被归约为唯一的 Garside 左贪婪规范形 <code>Δ^k · A₁ A₂ … A_m</code>（Aᵢ 为真简单元，相邻对左权重）。
@@ -109,6 +127,12 @@ code{background:#0d151f;padding:1px 6px;border-radius:4px;
     <p>逆元按 <code>σᵢ⁻¹ = ∂σᵢ·Δ⁻¹ = Δ⁻¹·τ(∂σᵢ)</code> 精确改写（Δ 移动时对途经因子施加翻转自同构 τ），
       远交换（|i−j|≥2）与三项编织关系（σᵢσᵢ₊₁σᵢ = σᵢ₊₁σᵢσᵢ₊₁）均由规范形的唯一性覆盖。
       判定不依赖有限次试变换、随机改写，也不仅凭诱导置换：即使两侧诱导置换同为恒等，只要规范链不同即判不等价。</p>
+    <p><b>闭合编织审计</b>：把每侧记录精确映射为可逆的约化 Burau 矩阵 <code>ρ(β) ∈ GL<sub>n−1</sub>(ℤ[t,t⁻¹])</code>，
+      两条重接记录闭合为环路后，由闭包公式（系数为精确整数，非浮点）
+      <code>Δ<sub>β̂</sub>(t) = det(I − ρ(β)) / (1+t+…+t<sup>n−1</sup>)</code>
+      计算规范化 Alexander 多项式，并由诱导置换的循环数给出闭合分量数 μ；空记录等分裂闭包稳定呈现零多项式与对应分量数。
+      指纹不同则在差异侧标出系数链；指纹相同仅说明该不变量未发现差异，<b>不代表两条辫必然等价</b>。
+      审计结论不以诱导置换或发生器计数为依据。</p>
   </section>
 </main>
 <script src="braid.js"></script>

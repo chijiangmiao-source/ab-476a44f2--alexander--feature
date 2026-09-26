@@ -240,6 +240,230 @@
     return r;
   }
 
+  /* ======================================================================
+   * 闭合编织审计：约化 Burau 表示 → 闭包 Alexander 指纹
+   *
+   * 对每侧记录精确构造可逆的约化 Burau 矩阵 ρ(β) ∈ GL_{n-1}(Z[t,t^-1])，
+   * 再由闭包公式（相差 ±t^k 的意义下）
+   *
+   *     Δ_{β̂}(t) = det(I_{n-1} − ρ(β)) / (1 + t + … + t^{n-1})
+   *
+   * 得到归一化 Alexander 多项式；闭包分量数 μ 为 β 诱导置换的循环数。
+   * 该指纹是辫等价的必要非充分条件：指纹不同 => 闭包不同；指纹相同
+   * 不得据此宣称两条辫等价。多分量分裂闭包（如空记录）行列式为零，
+   * 稳定给出零多项式与分量数。所有系数均为精确 BigInt，不做浮点近似，
+   * 也不使用诱导置换或发生器计数作为判据。
+   * ==================================================================== */
+
+  function BI(x) { return BigInt(x); }
+
+  // Laurent 多项式：{e0: t 的最低次幂, c: BigInt 系数数组（c[i] 对应 t^(e0+i)）}
+  function lp(e0, c) {
+    var arr = c.slice();
+    var lo = 0, hi = arr.length - 1;
+    while (lo <= hi && arr[lo] === BI(0)) { lo++; e0++; }
+    while (hi >= lo && arr[hi] === BI(0)) hi--;
+    if (lo > hi) return { e0: 0, c: [BI(0)] };
+    return { e0: e0, c: arr.slice(lo, hi + 1) };
+  }
+  var LP_ZERO = { e0: 0, c: [BI(0)] };
+  var LP_ONE = { e0: 0, c: [BI(1)] };
+  function lpIsZero(p) { return p.c.length === 1 && p.c[0] === BI(0); }
+  function lpEq(a, b) {
+    if (lpIsZero(a)) return lpIsZero(b);
+    if (lpIsZero(b)) return false;
+    if (a.e0 !== b.e0 || a.c.length !== b.c.length) return false;
+    for (var i = 0; i < a.c.length; i++) if (a.c[i] !== b.c[i]) return false;
+    return true;
+  }
+  function lpAdd(a, b) {
+    if (lpIsZero(a)) return b;
+    if (lpIsZero(b)) return a;
+    var lo = Math.min(a.e0, b.e0);
+    var hi = Math.max(a.e0 + a.c.length - 1, b.e0 + b.c.length - 1);
+    var c = new Array(hi - lo + 1);
+    for (var i = 0; i < c.length; i++) c[i] = BI(0);
+    for (var ia = 0; ia < a.c.length; ia++) c[a.e0 - lo + ia] += a.c[ia];
+    for (var ib = 0; ib < b.c.length; ib++) c[b.e0 - lo + ib] += b.c[ib];
+    return lp(lo, c);
+  }
+  function lpNeg(a) { return lp(a.e0, a.c.map(function (v) { return -v; })); }
+  function lpSub(a, b) { return lpAdd(a, lpNeg(b)); }
+  function lpMul(a, b) {
+    if (lpIsZero(a) || lpIsZero(b)) return LP_ZERO;
+    var c = new Array(a.c.length + b.c.length - 1);
+    for (var k = 0; k < c.length; k++) c[k] = BI(0);
+    for (var i = 0; i < a.c.length; i++)
+      for (var j = 0; j < b.c.length; j++) c[i + j] += a.c[i] * b.c[j];
+    return lp(a.e0 + b.e0, c);
+  }
+  // 普通多项式（e0=0）的精确带余除法：不整除即抛出（理论上闭包公式必整除）
+  function lpDivExact(a, b) {
+    if (lpIsZero(a)) return LP_ZERO;
+    if (a.e0 < 0 || b.e0 !== 0) throw new Error('polynomial division requires nonnegative powers');
+    var A = a.c.slice(), B = b.c;
+    var qdeg = A.length - B.length;
+    if (qdeg < 0) throw new Error('polynomial division: degree too small');
+    var q = new Array(qdeg + 1);
+    for (var k2 = 0; k2 < q.length; k2++) q[k2] = BI(0);
+    var lc = B[B.length - 1];
+    for (var d = A.length - 1; d >= B.length - 1; d--) {
+      var top = A[d];
+      if (top === BI(0)) continue;
+      if (top % lc !== BI(0)) throw new Error('polynomial division: leading coefficient indivisible');
+      var qc = top / lc, qi = d - (B.length - 1);
+      q[qi] = qc;
+      for (var jj = 0; jj < B.length; jj++) A[qi + jj] -= qc * B[jj];
+    }
+    for (var r = 0; r < A.length; r++) if (A[r] !== BI(0)) throw new Error('polynomial division: nonzero remainder');
+    return lp(a.e0, q);
+  }
+
+  // 矩阵（元素为 Laurent 多项式）
+  function mIdent(m) {
+    var M = [];
+    for (var i = 0; i < m; i++) {
+      var row = [];
+      for (var j = 0; j < m; j++) row.push(i === j ? LP_ONE : LP_ZERO);
+      M.push(row);
+    }
+    return M;
+  }
+  function mMul(A, B) {
+    var s = A.length, C = [];
+    for (var i = 0; i < s; i++) {
+      var row = [];
+      for (var j = 0; j < s; j++) {
+        var acc = LP_ZERO;
+        for (var k = 0; k < s; k++) acc = lpAdd(acc, lpMul(A[i][k], B[k][j]));
+        row.push(acc);
+      }
+      C.push(row);
+    }
+    return C;
+  }
+  function mEq(A, B) {
+    if (A.length !== B.length) return false;
+    for (var i = 0; i < A.length; i++) for (var j = 0; j < A.length; j++)
+      if (!lpEq(A[i][j], B[i][j])) return false;
+    return true;
+  }
+
+  var LP_T = lp(1, [BI(1)]);
+  var LP_TINV = lp(-1, [BI(1)]);
+  var LP_NEGT = lp(1, [BI(-1)]);
+  var LP_NEGTINV = lp(-1, [BI(-1)]);
+
+  // 约化 Burau 生成元（m=n-1 维，右乘作用；与逆元成对精确互逆）
+  function burauGen(n, k) {
+    var m = n - 1, M = mIdent(m);
+    if (m === 1) { M[0][0] = LP_NEGT; return M; }       // n=2：σ1 ↦ [-t]
+    if (k === 1) { M[0][0] = LP_NEGT; M[0][1] = LP_ONE; }
+    else if (k === n - 1) { M[m - 1][m - 2] = LP_T; M[m - 1][m - 1] = LP_NEGT; }
+    else { M[k - 1][k - 2] = LP_T; M[k - 1][k - 1] = LP_NEGT; M[k - 1][k] = LP_ONE; }
+    return M;
+  }
+  function burauGenInv(n, k) {
+    var m = n - 1, M = mIdent(m);
+    if (m === 1) { M[0][0] = LP_NEGTINV; return M; }    // σ1^-1 ↦ [-t^-1]
+    if (k === 1) { M[0][0] = LP_NEGTINV; M[0][1] = LP_TINV; }
+    else if (k === n - 1) { M[m - 1][m - 2] = LP_ONE; M[m - 1][m - 1] = LP_NEGTINV; }
+    else { M[k - 1][k - 2] = LP_ONE; M[k - 1][k - 1] = LP_NEGTINV; M[k - 1][k] = LP_TINV; }
+    return M;
+  }
+  function burauMatrix(n, gens) {
+    if (!Number.isInteger(n) || n < MIN_STRANDS || n > MAX_STRANDS) throw new Error('strand count out of range');
+    var M = mIdent(n - 1);
+    for (var t = 0; t < gens.length; t++) {
+      var g = gens[t];
+      M = mMul(M, g.e < 0 ? burauGenInv(n, g.i) : burauGen(n, g.i));
+    }
+    return M;
+  }
+
+  // Leibniz 展开求行列式（m≤5，至多 5!=120 项，精确无除法、无主元选取）
+  function detLaurent(M) {
+    var s = M.length;
+    function inversionSign(perm) {
+      var inv = 0;
+      for (var i = 0; i < s; i++) for (var j = i + 1; j < s; j++) if (perm[i] > perm[j]) inv++;
+      return inv % 2 ? -1 : 1;
+    }
+    var det = LP_ZERO;
+    (function go(k, perm, used, acc) {
+      if (k === s) { det = lpAdd(det, inversionSign(perm) < 0 ? lpNeg(acc) : acc); return; }
+      for (var v = 0; v < s; v++) if (!used[v]) {
+        used[v] = true; perm[k] = v;
+        go(k + 1, perm, used, lpMul(acc, M[k][v]));
+        used[v] = false;
+      }
+    })(0, [], [], LP_ONE);
+    return det;
+  }
+
+  function permutationCycles(p) {
+    var seen = {}, mu = 0;
+    for (var x = 0; x < p.length; x++) if (!seen[x + 1]) {
+      mu++;
+      var cur = x + 1;
+      while (!seen[cur]) { seen[cur] = true; cur = p[cur - 1]; }
+    }
+    return mu;
+  }
+
+  // 归一化：商多项式已约去首尾零系数（其 c[0] 即最低次项），
+  // Alexander 多项式只在 ±t^k 意义下唯一，故以最低次项为 t^0 并令其系数为正。
+  function normalizeAlex(q) {
+    var c = q.c;
+    if (c[0] < BI(0)) c = c.map(function (v) { return -v; });
+    return { e0: 0, c: c };
+  }
+
+  // 单侧闭包指纹：{components, alex: null(零多项式) | {e0:0,c:BigInt[]}, matrix}
+  function closureFingerprint(n, gens) {
+    var M = burauMatrix(n, gens);
+    var m = n - 1;
+    var I = mIdent(m), D = [];
+    for (var i = 0; i < m; i++) {
+      var row = [];
+      for (var j = 0; j < m; j++) row.push(lpSub(I[i][j], M[i][j]));
+      D.push(row);
+    }
+    var det = detLaurent(D);
+    var components = permutationCycles(inducedPerm(n, gens));
+    if (lpIsZero(det)) return { n: n, components: components, alex: null, matrix: M };
+
+    // det 可能含负次幂；乘 t^{-e0}（Laurent 单位）化为普通多项式：
+    // 乘幂后 det.c[i] 的指数恰由 e0+i 变为 i，故直接以 e0=0 重解释即可。
+    // 商与真正的 Δ 仅差一个 t^k，归一化（忽略整体 t 平移）后无影响。
+    var lifted = det.e0 < 0 ? lp(0, det.c) : det;
+    var sCoeffs = new Array(n);
+    for (var s2 = 0; s2 < n; s2++) sCoeffs[s2] = BI(1);
+    var q = lpDivExact(lifted, lp(0, sCoeffs));
+    return { n: n, components: components, alex: normalizeAlex(q), matrix: M };
+  }
+
+  // 双侧闭合编织审计
+  function auditClosures(n, gensA, gensB) {
+    var a = closureFingerprint(n, gensA);
+    var b = closureFingerprint(n, gensB);
+    var alexSame = (a.alex === null && b.alex === null) ||
+      (a.alex !== null && b.alex !== null && lpEq(a.alex, b.alex));
+    var compSame = a.components === b.components;
+    var differences = [];
+    if (!alexSame) differences.push('alexander');
+    if (!compSame) differences.push('components');
+    return {
+      n: n,
+      sideA: a,
+      sideB: b,
+      same: alexSame && compSame,
+      alexSame: alexSame,
+      compSame: compSame,
+      differences: differences,
+    };
+  }
+
   return {
     MIN_STRANDS: MIN_STRANDS,
     MAX_STRANDS: MAX_STRANDS,
@@ -251,6 +475,16 @@
     factorWord: factorWord,
     inducedPerm: inducedPerm,
     normalizePair: normalizePair,
+    closureFingerprint: closureFingerprint,
+    auditClosures: auditClosures,
+    burauMatrix: burauMatrix,
+    laurent: {
+      lp: lp, lpEq: lpEq, lpAdd: lpAdd, lpSub: lpSub, lpMul: lpMul,
+      lpDivExact: lpDivExact, lpIsZero: lpIsZero, detLaurent: detLaurent,
+      mIdent: mIdent, mMul: mMul, mEq: mEq,
+      burauGen: burauGen, burauGenInv: burauGenInv,
+      permutationCycles: permutationCycles,
+    },
     perms: {
       idPerm: idPerm, eqPerm: eqPerm, isIdentity: isIdentity, mul: mul,
       genPerm: genPerm, w0: w0, inverse: inverse, lengthPerm: lengthPerm,
